@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>แดชบอร์ดสรุปผลการประเมิน</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#F5F6F3; --card:#FFFFFF; --ink:#16241F; --muted:#5D6C66;
+  --line:#E2E7E2; --line2:#EEF1EC; --pine:#0F6D57; --pine-d:#0A3E33;
+  --pine-soft:#E7F1ED; --gold:#B0851F; --clay:#B14A34;
+  --shadow:0 1px 2px rgba(16,40,32,.05),0 8px 28px rgba(16,40,32,.06);
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:"IBM Plex Sans Thai",sans-serif;line-height:1.55}
+.mono{font-family:"IBM Plex Mono",monospace}
+.wrap{max-width:1160px;margin:0 auto;padding:0 22px}
+.mast{border-bottom:1px solid var(--line);background:var(--paper);padding:28px 0 20px}
+h1.title{font-size:24px;font-weight:700;margin:0}
+.sub{color:var(--muted);margin:8px 0 0;font-size:14px}
+.status-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:16px;background:var(--card);padding:10px 16px;border-radius:10px;border:1px solid var(--line)}
+.livestat{font-size:13px;display:inline-flex;align-items:center;gap:8px;font-weight:500}
+.livestat .dot{width:8px;height:8px;border-radius:50%;background:#C9A24A}
+.livestat.ok .dot{background:var(--pine)}
+.livestat.fail .dot{background:var(--clay)}
+.btn-refresh{border:0;background:var(--pine-soft);color:var(--pine-d);font-family:inherit;font-size:12px;font-weight:600;padding:5px 12px;border-radius:6px;cursor:pointer}
+.btn-refresh:hover{background:var(--pine);color:#fff}
+
+section{padding:20px 0}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;box-shadow:var(--shadow)}
+.kpi .lab{font-size:12px;color:var(--muted)}
+.kpi .val{font-size:28px;font-weight:700;margin-top:4px}
+
+.md{display:grid;grid-template-columns:320px 1fr;gap:18px;margin-top:16px}
+@media(max-width:800px){.md{grid-template-columns:1fr}}
+.listcard, .detail{background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);overflow:hidden}
+.lh{padding:12px 16px;border-bottom:1px solid var(--line2);font-weight:600}
+.wsrchbox{padding:8px 12px;border-bottom:1px solid var(--line2)}
+.wsearch{width:100%;border:1px solid var(--line);border-radius:6px;padding:6px 10px;font-family:inherit;font-size:13px;outline:none}
+.wlist{max-height:500px;overflow:auto}
+.witem{padding:10px 14px;border-bottom:1px solid var(--line2);cursor:pointer}
+.witem:hover{background:var(--paper)}
+.witem.on{background:var(--pine-soft);border-left:4px solid var(--pine)}
+.witem .c{font-size:11px;color:var(--pine);font-weight:600}
+.witem .n{font-size:13px;font-weight:500}
+
+.dh{padding:16px;border-bottom:1px solid var(--line2)}
+.dh h3{margin:4px 0 0;font-size:18px}
+.dstrip{display:grid;grid-template-columns:repeat(3,1fr);border-bottom:1px solid var(--line2);background:var(--paper)}
+.dstrip .c{padding:10px 14px;border-right:1px solid var(--line2)}
+.dstrip .c:last-child{border-right:0}
+.dstrip .c .l{font-size:11px;color:var(--muted)}
+.dstrip .c .v{font-size:18px;font-weight:700}
+.chart-container{padding:16px;border-bottom:1px solid var(--line2);height:260px;position:relative}
+.evwrap{padding:16px}
+.ev{border:1px solid var(--line);border-radius:8px;margin-bottom:10px;padding:12px}
+.ev-h{display:flex;justify-content:space-between;font-weight:600;font-size:13px;border-bottom:1px solid var(--line2);padding-bottom:6px;margin-bottom:6px}
+</style>
+</head>
+<body>
+
+<header class="mast">
+  <div class="wrap">
+    <h1 class="title">ระบบรวมผลการประเมินวิจัย (Track 1 Group 2)</h1>
+    <p class="sub">ดึงและประมวลผลข้อมูลสดจากชุดข้อมูลทั้ง 2 แหล่งอัตโนมัติ</p>
+    <div class="status-bar">
+      <span id="livestat" class="livestat"><span class="dot"></span><span id="livestat-txt">กำลังเตรียมการดึงข้อมูล...</span></span>
+      <button class="btn-refresh" onclick="fetchLiveData()">รีเฟรชข้อมูลสด</button>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <section>
+    <div class="kpis" id="kpis"></div>
+  </section>
+
+  <section>
+    <div class="md">
+      <aside class="listcard">
+        <div class="lh">รายชื่อผลงาน (<span id="wcount">0</span>)</div>
+        <div class="wsrchbox"><input id="wsearch" class="wsearch" type="search" placeholder="ค้นหาชื่อผลงาน / รหัส..." oninput="onSearch(this.value)"></div>
+        <div class="wlist" id="wlist"></div>
+      </aside>
+      <div class="detail" id="detail">
+        <div style="padding:20px;color:var(--muted)">กำลังโหลดข้อมูล...</div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script>
+const CSV_URLS = [
+  "https://docs.google.com/spreadsheets/d/e/2PACX-1vSBb1ZNENbvI4xuJeeKIAYZsChNjYT8QJmVrP3f1SYp8GzkqXm_c_kGAA-AMG78oIzyacre0lk6e5PZ/pub?output=csv",
+  "https://docs.google.com/spreadsheets/d/e/2PACX-1vS7WDlT0LhTNXF8TzEDw44WzE6I27jCDikDx8MpqsZOHm9x_eu-j9k1En_icW2wfGxKWbBx1IpNH9o-/pub?output=csv"
+];
+
+const EXCLUDE_EMAILS = ["res@nmu.ac.th"];
+
+let WORKS = [];
+let SELECTED_CODE = null;
+let SEARCH_QUERY = "";
+let chartInstance = null;
+
+function normalizeKey(str) {
+  return (str || "").toLowerCase().replace(/[^a-z0-9ก-๙]/g, "");
+}
+
+function extractCode(raw) {
+  const m = (raw || "").match(/^([A-Za-z0-9/\-]+)/);
+  return m ? m[1] : (raw || "").slice(0, 15);
+}
+
+function parseCSV(url) {
+  return new Promise((resolve) => {
+    const cacheBuster = (url.includes('?') ? '&' : '?') + 't=' + Date.now();
+    Papa.parse(url + cacheBuster, {
+      download: true,
+      skipEmptyLines: 'greedy',
+      complete: (res) => resolve(res.data || []),
+      error: () => resolve([])
+    });
+  });
+}
+
+async function fetchLiveData() {
+  const statTxt = document.getElementById('livestat-txt');
+  const statBox = document.getElementById('livestat');
+  statBox.className = "livestat";
+  statTxt.textContent = "กำลังดึงข้อมูลสดจากทั้ง 2 ลิงก์...";
+
+  const results = await Promise.all(CSV_URLS.map(url => parseCSV(url)));
+  const allRows = [...results[0], ...results[1]];
+
+  if (allRows.length > 0) {
+    processCSV(allRows);
+    statBox.className = "livestat ok";
+    statTxt.textContent = `โหลดสำเร็จ! - อัปเดตล่าสุด ${new Date().toLocaleTimeString('th-TH')}`;
+  } else {
+    statBox.className = "livestat fail";
+    statTxt.textContent = "ไม่สามารถเชื่อมต่อดึงข้อมูลได้ กรุณาลองใหม่อีกครั้ง";
+  }
+}
+
+function processCSV(rows) {
+  const workMap = {};
+  let judgeCount = 0;
+  const judgeMap = {};
+
+  rows.forEach(r => {
+    if (!r[0] || r[0].includes('ประทับเวลา') || !r[2] || !r[2].trim()) return;
+
+    const email = (r[1] || "").trim().toLowerCase();
+    if (EXCLUDE_EMAILS.includes(email)) return;
+
+    const rawName = r[2].trim();
+    const normKey = normalizeKey(rawName);
+    const code = extractCode(rawName);
+
+    if (email && !judgeMap[email]) {
+      judgeCount++;
+      judgeMap[email] = `กรรมการ ${judgeCount}`;
+    }
+    const judgeName = judgeMap[email] || "กรรมการ (ไม่ระบุ)";
+
+    const s1 = parseFloat(r[4]) || 0;
+    const s2 = parseFloat(r[5]) || 0;
+    const s3 = parseFloat(r[6]) || 0;
+    const s4 = parseFloat(r[7]) || 0;
+    const s5 = parseFloat(r[8]) || 0;
+    const total = parseFloat(r[15]) || (s1 + s2 + s3 + s4 + s5);
+
+    const evObj = {
+      judge: judgeName,
+      date: (r[0] || "").split(" ")[0],
+      scores: [s1, s2, s3, s4, s5],
+      total: total,
+      comments: r[14] || r[9] || "-"
+    };
+
+    if (!workMap[normKey]) {
+      workMap[normKey] = {
+        code: code,
+        name: rawName,
+        evals: []
+      };
+    }
+    workMap[normKey].evals.push(evObj);
+  });
+
+  WORKS = Object.values(workMap).map(w => {
+    const n = w.evals.length;
+    const grand = w.evals.reduce((s, e) => s + e.total, 0);
+    const avg = n ? Math.round((grand / n) * 10) / 10 : 0;
+    return {
+      code: w.code,
+      name: w.name,
+      evals: w.evals,
+      n: n,
+      grand: grand,
+      avg: avg
+    };
+  });
+
+  WORKS.sort((a, b) => b.grand - a.grand);
+  
+  if (WORKS.length > 0 && !SELECTED_CODE) {
+    SELECTED_CODE = WORKS[0].code;
+  }
+  renderUI();
+}
+
+function renderUI() {
+  const filtered = WORKS.filter(w => 
+    w.name.toLowerCase().includes(SEARCH_QUERY.toLowerCase()) || 
+    w.code.toLowerCase().includes(SEARCH_QUERY.toLowerCase())
+  );
+
+  document.getElementById('wcount').textContent = filtered.length;
+  
+  const totalEvals = WORKS.reduce((s, w) => s + w.n, 0);
+  const totalGrand = WORKS.reduce((s, w) => s + w.grand, 0);
+  const avgOverall = totalEvals ? Math.round((totalGrand / totalEvals) * 10) / 10 : 0;
+
+  document.getElementById('kpis').innerHTML = `
+    <div class="kpi"><div class="lab">ผลงานทั้งหมด</div><div class="val mono">${WORKS.length}</div></div>
+    <div class="kpi"><div class="lab">ใบประเมินรวม</div><div class="val mono">${totalEvals}</div></div>
+    <div class="kpi"><div class="lab">คะแนนรวมทั้งหมด</div><div class="val mono">${totalGrand}</div></div>
+    <div class="kpi"><div class="lab">คะแนนเฉลี่ยรวม</div><div class="val mono">${avgOverall}</div></div>
+  `;
+
+  document.getElementById('wlist').innerHTML = filtered.map(w => `
+    <div class="witem ${w.code === SELECTED_CODE ? 'on' : ''}" onclick="selectWork('${w.code}')">
+      <div class="c mono">${w.code}</div>
+      <div class="n">${w.name}</div>
+      <div style="font-size:11px;color:var(--muted);margin-top:2px;">
+        กรรมการ ${w.n} ท่าน | คะแนนรวม ${w.grand} (เฉลี่ย ${w.avg})
+      </div>
+    </div>
+  `).join('') || `<div style="padding:15px;color:var(--muted)">ไม่พบรายการ</div>`;
+
+  renderDetail();
+}
+
+function selectWork(code) {
+  SELECTED_CODE = code;
+  renderUI();
+}
+
+function onSearch(val) {
+  SEARCH_QUERY = val;
+  renderUI();
+}
+
+function renderDetail() {
+  const target = WORKS.find(w => w.code === SELECTED_CODE);
+  const area = document.getElementById('detail');
+
+  if (!target) {
+    area.innerHTML = `<div style="padding:20px;color:var(--muted)">กรุณาเลือกผลงานเพื่อดูรายละเอียด</div>`;
+    return;
+  }
+
+  area.innerHTML = `
+    <div class="dh">
+      <div class="mono" style="color:var(--pine);font-weight:600">${target.code}</div>
+      <h3>${target.name}</h3>
+    </div>
+    <div class="dstrip">
+      <div class="c"><div class="l">คะแนนรวม</div><div class="v mono">${target.grand}</div></div>
+      <div class="c"><div class="l">คะแนนเฉลี่ย</div><div class="v mono">${target.avg}</div></div>
+      <div class="c"><div class="l">จำนวนกรรมการ</div><div class="v mono">${target.n} คน</div></div>
+    </div>
+    <div class="chart-container">
+      <canvas id="detailChart"></canvas>
+    </div>
+    <div class="evwrap">
+      <h4 style="margin:0 0 12px">ใบประเมินรายบุคคล (${target.evals.length} รายการ)</h4>
+      ${target.evals.map(e => `
+        <div class="ev">
+          <div class="ev-h">
+            <span>${e.judge}</span>
+            <span class="mono" style="color:var(--pine)">${e.total} คะแนน</span>
+          </div>
+          <div style="font-size:12px;color:var(--muted);margin-bottom:6px">คะแนนรายด้าน: [${e.scores.join(', ')}]</div>
+          <div style="font-size:13px;color:#333"><b>ข้อคิดเห็น:</b> ${e.comments}</div>
+        </div>
+      `).join('')}
+    </div>
+  `;
+
+  renderChart(target);
+}
+
+function renderChart(target) {
+  const ctx = document.getElementById('detailChart');
+  if (!ctx) return;
+
+  if (chartInstance) {
+    chartInstance.destroy();
+  }
+
+  const labels = target.evals.map(e => e.judge);
+  const dataScores = target.evals.map(e => e.total);
+
+  chartInstance = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [{
+        label: 'คะแนนรวมกรรมการ',
+        data: dataScores,
+        backgroundColor: '#0F6D57',
+        borderRadius: 6
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false }
+      },
+      scales: {
+        y: {
+          beginAtZero: true,
+          suggestedMax: 100
+        }
+      }
+    }
+  });
+}
+
+window.addEventListener('DOMContentLoaded', fetchLiveData);
+</script>
+</body>
+</html>
